@@ -1,0 +1,73 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Get APK info
+        id: apk_info
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "APK: $APK_PATH ($APK_SIZE)"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dong-md-release
+          path: ${{ steps.apk_info.outputs.apk_path }}
+          retention-days: 30
+
+      - name: Comment PR with download link
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const apkSize = '${{ steps.apk_info.outputs.apk_size }}';
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚀 APK 构建完成\n\n` +
+                    `- **大小**: ${apkSize}\n` +
+                    `- **Artifact**: dong-md-release\n\n` +
+                    `> 请在 Actions 详情页的 Artifacts 区域下载 APK\n` +
+                    `> APK 保留 30 天\n\n` +
+                    `📋 [查看构建日志](${runUrl})`
+            });
