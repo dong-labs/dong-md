@@ -31,12 +31,14 @@ class DongMDApp extends StatelessWidget {
 class FileRecord {
   final String id;
   final String fileName;
+  final String localPath;  // 本地保存路径
   final String content;
   final DateTime openedAt;
 
   FileRecord({
     required this.id,
     required this.fileName,
+    required this.localPath,
     required this.content,
     required this.openedAt,
   });
@@ -44,6 +46,7 @@ class FileRecord {
   Map<String, dynamic> toJson() => {
     'id': id,
     'fileName': fileName,
+    'localPath': localPath,
     'content': content,
     'openedAt': openedAt.toIso8601String(),
   };
@@ -51,9 +54,65 @@ class FileRecord {
   factory FileRecord.fromJson(Map<String, dynamic> json) => FileRecord(
     id: json['id'],
     fileName: json['fileName'],
+    localPath: json['localPath'],
     content: json['content'],
     openedAt: DateTime.parse(json['openedAt']),
   );
+}
+
+class FileManager {
+  static Future<String> saveFile(String fileName, String content) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final mdDir = Directory('${dir.path}/dong-md/files');
+    await mdDir.create(recursive: true);
+    
+    String targetName = fileName;
+    String targetPath = '${mdDir.path}/$targetName';
+    
+    // 检查重名
+    if (File(targetPath).existsSync()) {
+      final existingContent = File(targetPath).readAsStringSync();
+      if (existingContent == content) {
+        return targetPath; // 内容相同，不覆盖
+      }
+      
+      // 内容不同，添加后缀
+      int counter = 1;
+      final baseName = fileName.endsWith('.md') 
+          ? fileName.substring(0, fileName.length - 3) 
+          : fileName;
+      
+      while (true) {
+        targetName = '${baseName}_$counter.md';
+        targetPath = '${mdDir.path}/$targetName';
+        if (!File(targetPath).existsSync()) break;
+        
+        final existing = File(targetPath).readAsStringSync();
+        if (existing == content) {
+          return targetPath; // 找到相同内容的文件
+        }
+        counter++;
+      }
+    }
+    
+    await File(targetPath).writeAsString(content);
+    return targetPath;
+  }
+  
+  static Future<int> getFileSize(String path) async {
+    final file = File(path);
+    if (await file.exists()) {
+      return await file.length();
+    }
+    return 0;
+  }
+  
+  static Future<void> deleteFile(String path) async {
+    final file = File(path);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -93,10 +152,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addFileToHistory(String fileName, String content) async {
+    // 保存到本地文件
+    final localPath = await FileManager.saveFile(fileName, content);
+    
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     final record = FileRecord(
       id: id,
       fileName: fileName,
+      localPath: localPath,
       content: content,
       openedAt: DateTime.now(),
     );
@@ -116,6 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
         // 添加到历史（保存内容到本地）
         await _addFileToHistory(fileName, content);
         
+        // 保存文件获取本地路径
+        final localPath = await FileManager.saveFile(fileName, content);
+        
         // 跳转到阅读页面
         if (mounted) {
           Navigator.push(
@@ -124,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context) => ReaderScreen(
                 fileName: fileName,
                 content: content,
+                localPath: localPath,
               ),
             ),
           );
@@ -219,6 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (context) => ReaderScreen(
                   fileName: record.fileName,
                   content: record.content,
+                  localPath: record.localPath,
                 ),
               ),
             );
@@ -247,11 +315,13 @@ class _HomeScreenState extends State<HomeScreen> {
 class ReaderScreen extends StatefulWidget {
   final String fileName;
   final String content;
+  final String localPath;
 
   const ReaderScreen({
     super.key,
     required this.fileName,
     required this.content,
+    required this.localPath,
   });
 
   @override
@@ -271,6 +341,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            // 外部链接用系统浏览器打开
+            if (request.url.startsWith('http://') || 
+                request.url.startsWith('https://')) {
+              launchUrl(Uri.parse(request.url));
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
       ..loadHtmlString(_buildHtmlTemplate(widget.content));
   }
 
@@ -280,17 +363,50 @@ class _ReaderScreenState extends State<ReaderScreen> {
       appBar: AppBar(
         title: Text(widget.fileName),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.share),
-            tooltip: '分享',
-            onPressed: () {
-              Share.share(widget.content, subject: widget.fileName);
+            onSelected: (value) {
+              if (value == 'content') {
+                Share.share(widget.content, subject: widget.fileName);
+              } else if (value == 'file') {
+                Share.shareXFiles(
+                  [XFile(widget.localPath)],
+                  subject: widget.fileName,
+                );
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'content',
+                child: ListTile(
+                  leading: Icon(Icons.text_fields),
+                  title: Text('分享内容'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'file',
+                child: ListTile(
+                  leading: Icon(Icons.insert_drive_file),
+                  title: Text('分享文件'),
+                ),
+              ),
+            ],
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
-              if (value == 'about') {
+              if (value == 'detail') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FileDetailScreen(
+                      fileName: widget.fileName,
+                      localPath: widget.localPath,
+                      content: widget.content,
+                    ),
+                  ),
+                );
+              } else if (value == 'about') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AboutScreen()),
@@ -299,9 +415,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
-                value: 'about',
+                value: 'detail',
                 child: ListTile(
                   leading: Icon(Icons.info_outline),
+                  title: Text('文件详情'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'about',
+                child: ListTile(
+                  leading: Icon(Icons.info),
                   title: Text('关于'),
                 ),
               ),
@@ -415,20 +538,156 @@ class _ReaderScreenState extends State<ReaderScreen> {
     });
     
     mermaid.init(undefined, '.mermaid');
-    
-    document.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const href = link.getAttribute('href');
-        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-          window.open(href, '_blank');
-        }
-      });
-    });
   </script>
 </body>
 </html>
 ''';
+  }
+}
+
+class FileDetailScreen extends StatelessWidget {
+  final String fileName;
+  final String localPath;
+  final String content;
+
+  const FileDetailScreen({
+    super.key,
+    required this.fileName,
+    required this.localPath,
+    required this.content,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fileSize = File(localPath).lengthSync();
+    final wordCount = content.length;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('文件详情'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // 文件图标和名称
+          Center(
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.description,
+                    size: 32,
+                    color: Colors.orange,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  fileName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // 文件路径
+          ListTile(
+            leading: const Icon(Icons.folder),
+            title: const Text('文件路径'),
+            subtitle: Text(
+              localPath,
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.copy),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: localPath));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('路径已复制')),
+                );
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // 文件大小
+          ListTile(
+            leading: const Icon(Icons.storage),
+            title: const Text('文件大小'),
+            subtitle: Text(_formatFileSize(fileSize)),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // 字数统计
+          ListTile(
+            leading: const Icon(Icons.text_fields),
+            title: const Text('字数统计'),
+            subtitle: Text('$wordCount 字'),
+          ),
+          
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // 删除按钮
+          ListTile(
+            leading: const Icon(Icons.delete, color: Colors.red),
+            title: const Text(
+              '删除文件',
+              style: TextStyle(color: Colors.red),
+            ),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('确认删除'),
+                  content: Text('确定要删除「$fileName」吗？'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await FileManager.deleteFile(localPath);
+                        if (context.mounted) {
+                          Navigator.pop(context); // 关闭对话框
+                          Navigator.pop(context); // 返回上一页
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('文件已删除')),
+                          );
+                        }
+                      },
+                      child: const Text('删除', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
 
@@ -501,7 +760,7 @@ class AboutScreen extends StatelessWidget {
               
               // 版本
               Text(
-                'v1.1.0',
+                'v1.3.0',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[500],
