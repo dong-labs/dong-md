@@ -31,7 +31,7 @@ class DongMDApp extends StatelessWidget {
 class FileRecord {
   final String id;
   final String fileName;
-  final String localPath;  // 本地保存路径
+  final String localPath;
   final String content;
   final DateTime openedAt;
 
@@ -69,14 +69,12 @@ class FileManager {
     String targetName = fileName;
     String targetPath = '${mdDir.path}/$targetName';
     
-    // 检查重名
     if (File(targetPath).existsSync()) {
       final existingContent = File(targetPath).readAsStringSync();
       if (existingContent == content) {
-        return targetPath; // 内容相同，不覆盖
+        return targetPath;
       }
       
-      // 内容不同，添加后缀
       int counter = 1;
       final baseName = fileName.endsWith('.md') 
           ? fileName.substring(0, fileName.length - 3) 
@@ -89,7 +87,7 @@ class FileManager {
         
         final existing = File(targetPath).readAsStringSync();
         if (existing == content) {
-          return targetPath; // 找到相同内容的文件
+          return targetPath;
         }
         counter++;
       }
@@ -127,6 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
   
   List<FileRecord> _history = [];
   bool _isLoading = true;
+  bool _isSearching = false;
+  String _searchQuery = '';
+  
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -152,7 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addFileToHistory(String fileName, String content) async {
-    // 保存到本地文件
     final localPath = await FileManager.saveFile(fileName, content);
     
     final id = DateTime.now().millisecondsSinceEpoch.toString();
@@ -176,13 +177,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final content = call.arguments['content'] as String;
         final fileName = path?.split('/').last ?? '未命名.md';
         
-        // 添加到历史（保存内容到本地）
         await _addFileToHistory(fileName, content);
         
-        // 保存文件获取本地路径
         final localPath = await FileManager.saveFile(fileName, content);
         
-        // 跳转到阅读页面
         if (mounted) {
           Navigator.push(
             context,
@@ -199,12 +197,45 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  List<FileRecord> get _filteredHistory {
+    if (_searchQuery.isEmpty) return _history;
+    return _history.where((record) => 
+      record.fileName.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dong MD'),
+        title: _isSearching 
+          ? TextField(
+              controller: _searchController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '搜索文件...',
+                border: InputBorder.none,
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            )
+          : const Text('Dong MD'),
         actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
@@ -237,30 +268,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_history.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final filtered = _filteredHistory;
+    
+    if (filtered.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.description, size: 64, color: Colors.grey),
+            Icon(Icons.search_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text(
-              'Dong MD',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '阅读 Markdown，就这么简单',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              '从文件管理器打开 Markdown 文件',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '支持：.md, .markdown, .txt',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              '未找到 "$_searchQuery"',
+              style: TextStyle(color: Colors.grey[600]),
             ),
           ],
         ),
@@ -268,18 +290,153 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ListView.builder(
-      itemCount: _history.length,
+      itemCount: filtered.length,
       itemBuilder: (context, index) {
-        final record = _history[index];
-        
-        return ListTile(
-          leading: const Icon(Icons.description, color: Colors.orange),
-          title: Text(record.fileName),
-          subtitle: Text(
-            _formatDate(record.openedAt),
+        final record = filtered[index];
+        return _buildHistoryItem(record);
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Logo
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.description,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // 标题
+            const Text(
+              'Dong MD',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Slogan
+            Text(
+              '阅读 Markdown，就这么简单',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            
+            const SizedBox(height: 48),
+            
+            // 功能说明卡片
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _buildFeatureItem(
+                      Icons.share,
+                      '从其他应用分享',
+                      '微信 / Telegram / 文件管理器',
+                    ),
+                    const Divider(),
+                    _buildFeatureItem(
+                      Icons.folder_open,
+                      '从文件管理器打开',
+                      '支持 .md / .markdown / .txt',
+                    ),
+                    const Divider(),
+                    _buildFeatureItem(
+                      Icons.auto_awesome,
+                      '支持 Mermaid 流程图',
+                      '自动渲染表格和流程图',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.orange),
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+      ),
+    );
+  }
+
+  Widget _buildHistoryItem(FileRecord record) {
+    final fileSize = File(record.localPath).lengthSync();
+    final wordCount = record.content.length;
+    
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.description, color: Colors.orange),
+      ),
+      title: Text(
+        record.fileName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_formatDate(record.openedAt)} · ${_formatFileSize(fileSize)}',
             style: const TextStyle(fontSize: 12),
           ),
-          onTap: () {
+          Text(
+            '$wordCount 字',
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          ),
+        ],
+      ),
+      isThreeLine: true,
+      trailing: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (value) {
+          if (value == 'open') {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -290,9 +447,116 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             );
-          },
+          } else if (value == 'share_content') {
+            Share.share(record.content, subject: record.fileName);
+          } else if (value == 'share_file') {
+            Share.shareXFiles(
+              [XFile(record.localPath)],
+              subject: record.fileName,
+            );
+          } else if (value == 'detail') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FileDetailScreen(
+                  fileName: record.fileName,
+                  localPath: record.localPath,
+                  content: record.content,
+                  onDelete: () {
+                    setState(() {
+                      _history.removeWhere((r) => r.id == record.id);
+                    });
+                    _saveHistory();
+                  },
+                ),
+              ),
+            );
+          } else if (value == 'delete') {
+            _showDeleteDialog(record);
+          }
+        },
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 'open',
+            child: ListTile(
+              leading: Icon(Icons.open_in_new),
+              title: Text('打开'),
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'share_content',
+            child: ListTile(
+              leading: Icon(Icons.text_fields),
+              title: Text('分享内容'),
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'share_file',
+            child: ListTile(
+              leading: Icon(Icons.insert_drive_file),
+              title: Text('分享文件'),
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'detail',
+            child: ListTile(
+              leading: Icon(Icons.info_outline),
+              title: Text('文件详情'),
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              leading: Icon(Icons.delete, color: Colors.red),
+              title: Text('删除', style: TextStyle(color: Colors.red)),
+            ),
+          ),
+        ],
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReaderScreen(
+              fileName: record.fileName,
+              content: record.content,
+              localPath: record.localPath,
+            ),
+          ),
         );
       },
+    );
+  }
+
+  void _showDeleteDialog(FileRecord record) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除「${record.fileName}」吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await FileManager.deleteFile(record.localPath);
+              setState(() {
+                _history.removeWhere((r) => r.id == record.id);
+              });
+              await _saveHistory();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已删除')),
+                );
+              }
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -309,6 +573,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       return '${date.month}-${date.day}';
     }
+  }
+  
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
 
@@ -344,7 +614,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
-            // 外部链接用系统浏览器打开
             if (request.url.startsWith('http://') || 
                 request.url.startsWith('https://')) {
               launchUrl(Uri.parse(request.url));
@@ -549,12 +818,14 @@ class FileDetailScreen extends StatelessWidget {
   final String fileName;
   final String localPath;
   final String content;
+  final VoidCallback? onDelete;
 
   const FileDetailScreen({
     super.key,
     required this.fileName,
     required this.localPath,
     required this.content,
+    this.onDelete,
   });
 
   @override
@@ -569,7 +840,6 @@ class FileDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 文件图标和名称
           Center(
             child: Column(
               children: [
@@ -602,7 +872,6 @@ class FileDetailScreen extends StatelessWidget {
           const Divider(),
           const SizedBox(height: 16),
           
-          // 文件路径
           ListTile(
             leading: const Icon(Icons.folder),
             title: const Text('文件路径'),
@@ -623,7 +892,6 @@ class FileDetailScreen extends StatelessWidget {
           
           const SizedBox(height: 8),
           
-          // 文件大小
           ListTile(
             leading: const Icon(Icons.storage),
             title: const Text('文件大小'),
@@ -632,7 +900,6 @@ class FileDetailScreen extends StatelessWidget {
           
           const SizedBox(height: 8),
           
-          // 字数统计
           ListTile(
             leading: const Icon(Icons.text_fields),
             title: const Text('字数统计'),
@@ -643,7 +910,6 @@ class FileDetailScreen extends StatelessWidget {
           const Divider(),
           const SizedBox(height: 16),
           
-          // 删除按钮
           ListTile(
             leading: const Icon(Icons.delete, color: Colors.red),
             title: const Text(
@@ -665,8 +931,9 @@ class FileDetailScreen extends StatelessWidget {
                       onPressed: () async {
                         await FileManager.deleteFile(localPath);
                         if (context.mounted) {
-                          Navigator.pop(context); // 关闭对话框
-                          Navigator.pop(context); // 返回上一页
+                          Navigator.pop(context);
+                          Navigator.pop(context);
+                          onDelete?.call();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('文件已删除')),
                           );
@@ -708,7 +975,6 @@ class AboutScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 32),
               
-              // App 图标
               Container(
                 width: 96,
                 height: 96,
@@ -736,7 +1002,6 @@ class AboutScreen extends StatelessWidget {
               
               const SizedBox(height: 24),
               
-              // App 名称
               const Text(
                 'Dong MD',
                 style: TextStyle(
@@ -747,7 +1012,6 @@ class AboutScreen extends StatelessWidget {
               
               const SizedBox(height: 8),
               
-              // Slogan
               Text(
                 '阅读 Markdown，就这么简单',
                 style: TextStyle(
@@ -758,9 +1022,8 @@ class AboutScreen extends StatelessWidget {
               
               const SizedBox(height: 8),
               
-              // 版本
               Text(
-                'v1.3.0',
+                'v1.4.0',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[500],
@@ -769,7 +1032,6 @@ class AboutScreen extends StatelessWidget {
               
               const SizedBox(height: 32),
               
-              // 信息卡片
               _buildInfoCard(
                 icon: Icons.person,
                 title: '开发者',
@@ -820,7 +1082,6 @@ class AboutScreen extends StatelessWidget {
               
               const SizedBox(height: 32),
               
-              // 底部说明
               Text(
                 '支持 Markdown 和 Mermaid 流程图',
                 style: TextStyle(
