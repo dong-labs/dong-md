@@ -58,6 +58,19 @@ class FileRecord {
     content: json['content'],
     openedAt: DateTime.parse(json['openedAt']),
   );
+  
+  FileRecord copyWith({
+    String? fileName,
+    String? localPath,
+  }) {
+    return FileRecord(
+      id: id,
+      fileName: fileName ?? this.fileName,
+      localPath: localPath ?? this.localPath,
+      content: content,
+      openedAt: openedAt,
+    );
+  }
 }
 
 class FileManager {
@@ -95,6 +108,31 @@ class FileManager {
     
     await File(targetPath).writeAsString(content);
     return targetPath;
+  }
+  
+  static Future<String> renameFile(String oldPath, String newFileName) async {
+    final oldFile = File(oldPath);
+    if (!await oldFile.exists()) return oldPath;
+    
+    final dir = await getApplicationDocumentsDirectory();
+    final mdDir = Directory('${dir.path}/dong-md/files');
+    
+    String newPath = '${mdDir.path}/$newFileName';
+    
+    // 如果目标文件已存在，添加后缀
+    if (File(newPath).existsSync()) {
+      final baseName = newFileName.endsWith('.md') 
+          ? newFileName.substring(0, newFileName.length - 3) 
+          : newFileName;
+      int counter = 1;
+      while (File('${mdDir.path}/${baseName}_$counter.md').existsSync()) {
+        counter++;
+      }
+      newPath = '${mdDir.path}/${baseName}_$counter.md';
+    }
+    
+    await oldFile.rename(newPath);
+    return newPath;
   }
   
   static Future<int> getFileSize(String path) async {
@@ -293,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final record = filtered[index];
-        return _buildHistoryItem(record);
+        return _buildHistoryItem(record, index);
       },
     );
   }
@@ -400,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHistoryItem(FileRecord record) {
+  Widget _buildHistoryItem(FileRecord record, int index) {
     final fileSize = File(record.localPath).lengthSync();
     final wordCount = record.content.length;
     
@@ -435,52 +473,20 @@ class _HomeScreenState extends State<HomeScreen> {
       isThreeLine: true,
       trailing: PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert),
-        onSelected: (value) {
-          if (value == 'open') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ReaderScreen(
-                  fileName: record.fileName,
-                  content: record.content,
-                  localPath: record.localPath,
-                ),
-              ),
-            );
-          } else if (value == 'share_content') {
-            Share.share(record.content, subject: record.fileName);
-          } else if (value == 'share_file') {
-            Share.shareXFiles(
-              [XFile(record.localPath)],
-              subject: record.fileName,
-            );
-          } else if (value == 'detail') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FileDetailScreen(
-                  fileName: record.fileName,
-                  localPath: record.localPath,
-                  content: record.content,
-                  onDelete: () {
-                    setState(() {
-                      _history.removeWhere((r) => r.id == record.id);
-                    });
-                    _saveHistory();
-                  },
-                ),
-              ),
-            );
-          } else if (value == 'delete') {
-            _showDeleteDialog(record);
-          }
-        },
+        onSelected: (value) => _handleMenuAction(value, record, index),
         itemBuilder: (context) => [
           const PopupMenuItem(
             value: 'open',
             child: ListTile(
               leading: Icon(Icons.open_in_new),
               title: Text('打开'),
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'rename',
+            child: ListTile(
+              leading: Icon(Icons.edit),
+              title: Text('重命名'),
             ),
           ),
           const PopupMenuItem(
@@ -525,6 +531,112 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _handleMenuAction(String action, FileRecord record, int index) {
+    switch (action) {
+      case 'open':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReaderScreen(
+              fileName: record.fileName,
+              content: record.content,
+              localPath: record.localPath,
+            ),
+          ),
+        );
+        break;
+      case 'rename':
+        _showRenameDialog(record, index);
+        break;
+      case 'share_content':
+        Share.share(record.content, subject: record.fileName);
+        break;
+      case 'share_file':
+        Share.shareXFiles(
+          [XFile(record.localPath)],
+          subject: record.fileName,
+        );
+        break;
+      case 'detail':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FileDetailScreen(
+              fileName: record.fileName,
+              localPath: record.localPath,
+              content: record.content,
+              onDelete: () {
+                setState(() {
+                  _history.removeWhere((r) => r.id == record.id);
+                });
+                _saveHistory();
+              },
+            ),
+          ),
+        );
+        break;
+      case 'delete':
+        _showDeleteDialog(record);
+        break;
+    }
+  }
+
+  void _showRenameDialog(FileRecord record, int index) {
+    final controller = TextEditingController(text: record.fileName);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重命名'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入文件名',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty || newName == record.fileName) {
+                Navigator.pop(context);
+                return;
+              }
+              
+              // 确保文件名有 .md 后缀
+              final finalName = newName.endsWith('.md') ? newName : '$newName.md';
+              
+              // 重命名文件
+              final newPath = await FileManager.renameFile(record.localPath, finalName);
+              
+              // 更新记录
+              setState(() {
+                _history[index] = record.copyWith(
+                  fileName: finalName,
+                  localPath: newPath,
+                );
+              });
+              await _saveHistory();
+              
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已重命名')),
+                );
+              }
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1023,7 +1135,7 @@ class AboutScreen extends StatelessWidget {
               const SizedBox(height: 8),
               
               Text(
-                'v1.4.0',
+                'v1.5.0',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[500],
