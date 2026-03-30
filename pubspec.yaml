@@ -3,7 +3,7 @@ description: Dong MD - 阅读 Markdown，就这么简单
 
 publish_to: none
 
-version: 1.4.0+1
+version: 1.4.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
