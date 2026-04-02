@@ -830,67 +830,119 @@ class _ReaderScreenState extends State<ReaderScreen> {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: 16px;
       background: #fff;
       color: #333;
       line-height: 1.6;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
+    
+    /* 图片优化：自适应宽度，不超出屏幕 */
+    img {
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+      display: block;
+      margin: 16px 0;
+      border-radius: 8px;
+    }
+    
+    /* 链接优化：长链接自动换行 */
+    a {
+      color: #ff9800;
+      text-decoration: none;
+      word-break: break-all;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    
     pre {
       background: #f5f5f5;
       padding: 12px;
       border-radius: 8px;
       overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
+    
     code {
       font-family: "SF Mono", Monaco, monospace;
       font-size: 14px;
+      word-break: break-all;
     }
+    
     table {
       border-collapse: collapse;
       width: 100%;
       margin: 16px 0;
+      overflow-x: auto;
+      display: block;
     }
+    
     th, td {
       border: 1px solid #ddd;
       padding: 8px;
       text-align: left;
+      word-break: break-word;
     }
+    
     th {
       background: #f5f5f5;
       font-weight: bold;
     }
+    
     .mermaid {
       background: #fafafa;
       padding: 16px;
       border-radius: 8px;
       margin: 16px 0;
       text-align: center;
+      overflow-x: auto;
     }
-    a {
-      color: #ff9800;
-      text-decoration: none;
-    }
+    
     h1, h2, h3, h4, h5, h6 {
       margin-top: 24px;
       margin-bottom: 16px;
       font-weight: 600;
+      word-break: break-word;
     }
+    
     h1 { font-size: 2em; border-bottom: 1px solid #eee; padding-bottom: 8px; }
     h2 { font-size: 1.5em; }
     h3 { font-size: 1.25em; }
+    
     blockquote {
       border-left: 4px solid #ddd;
       padding-left: 16px;
       color: #666;
       margin: 16px 0;
+      word-break: break-word;
     }
+    
     ul, ol {
       padding-left: 24px;
     }
+    
     li {
       margin: 8px 0;
+      word-break: break-word;
+    }
+    
+    p {
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
   </style>
 </head>
