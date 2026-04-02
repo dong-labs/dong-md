@@ -12,6 +12,164 @@ void main() {
   runApp(const DongMDApp());
 }
 
+/// 文件类型枚举
+enum FileType {
+  markdown,
+  html,
+  json,
+  plainText,
+}
+
+/// 文件类型检测工具
+class FileDetector {
+  /// 根据扩展名判断文件类型
+  static FileType detectByExtension(String fileName) {
+    final ext = fileName.toLowerCase();
+    
+    // Markdown 文件
+    if (ext.endsWith('.md') || 
+        ext.endsWith('.markdown') || 
+        ext.endsWith('.mdown') ||
+        ext.endsWith('.mkd')) {
+      return FileType.markdown;
+    }
+    
+    // HTML 文件
+    if (ext.endsWith('.html') || ext.endsWith('.htm')) {
+      return FileType.html;
+    }
+    
+    // JSON 文件
+    if (ext.endsWith('.json')) {
+      return FileType.json;
+    }
+    
+    // 纯文本
+    return FileType.plainText;
+  }
+  
+  /// 根据内容检测文件类型
+  static FileType detectByContent(String content) {
+    final trimmed = content.trim();
+    
+    // 检测 HTML
+    if (_isHtml(trimmed)) {
+      return FileType.html;
+    }
+    
+    // 检测 JSON
+    if (_isJson(trimmed)) {
+      return FileType.json;
+    }
+    
+    // 检测 Markdown
+    if (_isMarkdown(trimmed)) {
+      return FileType.markdown;
+    }
+    
+    // 默认纯文本
+    return FileType.plainText;
+  }
+  
+  /// 混合检测（扩展名 + 内容）
+  static FileType detect(String fileName, String content) {
+    // 先检查扩展名
+    final extType = detectByExtension(fileName);
+    
+    // 如果是明确的类型，直接返回
+    if (extType == FileType.markdown || 
+        extType == FileType.html || 
+        extType == FileType.json) {
+      return extType;
+    }
+    
+    // .txt 或未知扩展名，检查内容
+    return detectByContent(content);
+  }
+  
+  /// 检测是否为 HTML
+  static bool _isHtml(String content) {
+    final htmlPattern = RegExp(
+      r'<(html|body|div|p|span|h1|h2|h3|ul|ol|li|table|form|input|script|style|meta|link)\b',
+      caseSensitive: false,
+    );
+    return htmlPattern.hasMatch(content);
+  }
+  
+  /// 检测是否为 JSON
+  static bool _isJson(String content) {
+    if (!content.startsWith('{') && !content.startsWith('[')) {
+      return false;
+    }
+    try {
+      jsonDecode(content);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// 检测是否为 Markdown
+  static bool _isMarkdown(String content) {
+    int score = 0;
+    
+    // 标题标记
+    if (RegExp(r'^#{1,6}\s', multiLine: true).hasMatch(content)) score += 3;
+    
+    // 粗体/斜体
+    if (RegExp(r'\*\*.*?\*\*|__.*?__').hasMatch(content)) score += 2;
+    if (RegExp(r'\*.*?\*|_.*?_').hasMatch(content)) score += 1;
+    
+    // 链接
+    if (RegExp(r'\[.*?\]\(.*?\)').hasMatch(content)) score += 3;
+    
+    // 代码块
+    if (RegExp(r'```[\s\S]*?```').hasMatch(content)) score += 3;
+    if (RegExp(r'`[^`]+`').hasMatch(content)) score += 1;
+    
+    // 列表
+    if (RegExp(r'^\s*[-*+]\s', multiLine: true).hasMatch(content)) score += 2;
+    if (RegExp(r'^\s*\d+\.\s', multiLine: true).hasMatch(content)) score += 2;
+    
+    // 引用
+    if (RegExp(r'^>\s', multiLine: true).hasMatch(content)) score += 2;
+    
+    // 表格
+    if (RegExp(r'\|.*\|').hasMatch(content)) score += 2;
+    
+    // 如果得分 >= 3，认为是 Markdown
+    return score >= 3;
+  }
+  
+  /// 获取文件类型显示名称
+  static String getFileTypeName(FileType type) {
+    switch (type) {
+      case FileType.markdown:
+        return 'Markdown';
+      case FileType.html:
+        return 'HTML';
+      case FileType.json:
+        return 'JSON';
+      case FileType.plainText:
+        return '纯文本';
+    }
+  }
+  
+  /// 获取文件类型图标
+  static IconData getFileTypeIcon(FileType type) {
+    switch (type) {
+      case FileType.markdown:
+        return Icons.description;
+      case FileType.html:
+        return Icons.web;
+      case FileType.json:
+        return Icons.code;
+      case FileType.plainText:
+        return Icons.text_snippet;
+    }
+  }
+}
+
 class DongMDApp extends StatelessWidget {
   const DongMDApp({super.key});
 
@@ -219,7 +377,25 @@ class _HomeScreenState extends State<HomeScreen> {
         
         final localPath = await FileManager.saveFile(fileName, content);
         
+        // 检测文件类型
+        final fileType = FileDetector.detect(fileName, content);
+        
         if (mounted) {
+          // 显示文件类型提示
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(FileDetector.getFileTypeIcon(fileType), 
+                       color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Text('正在打开 ${FileDetector.getFileTypeName(fileType)} 文件...'),
+                ],
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+          
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -227,6 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 fileName: fileName,
                 content: content,
                 localPath: localPath,
+                fileType: fileType,
               ),
             ),
           );
@@ -520,6 +697,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       onTap: () {
+        final fileType = FileDetector.detect(record.fileName, record.content);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -527,6 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fileName: record.fileName,
               content: record.content,
               localPath: record.localPath,
+              fileType: fileType,
             ),
           ),
         );
@@ -537,6 +716,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleMenuAction(String action, FileRecord record, int index) {
     switch (action) {
       case 'open':
+        final fileType = FileDetector.detect(record.fileName, record.content);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -544,6 +724,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fileName: record.fileName,
               content: record.content,
               localPath: record.localPath,
+              fileType: fileType,
             ),
           ),
         );
@@ -698,12 +879,14 @@ class ReaderScreen extends StatefulWidget {
   final String fileName;
   final String content;
   final String localPath;
+  final FileType fileType;
 
   const ReaderScreen({
     super.key,
     required this.fileName,
     required this.content,
     required this.localPath,
+    this.fileType = FileType.markdown,
   });
 
   @override
@@ -734,15 +917,41 @@ class _ReaderScreenState extends State<ReaderScreen> {
             return NavigationDecision.navigate;
           },
         ),
-      )
-      ..loadHtmlString(_buildHtmlTemplate(widget.content));
+      );
+    
+    // 根据文件类型加载不同的 HTML 模板
+    switch (widget.fileType) {
+      case FileType.markdown:
+        _controller.loadHtmlString(_buildMarkdownTemplate(widget.content));
+        break;
+      case FileType.html:
+        _controller.loadHtmlString(_buildHtmlTemplate(widget.content));
+        break;
+      case FileType.json:
+        _controller.loadHtmlString(_buildJsonTemplate(widget.content));
+        break;
+      case FileType.plainText:
+        _controller.loadHtmlString(_buildPlainTextTemplate(widget.content));
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.fileName),
+        title: Row(
+          children: [
+            Icon(FileDetector.getFileTypeIcon(widget.fileType), size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                widget.fileName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.share),
@@ -817,12 +1026,113 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  String _buildHtmlTemplate(String markdown) {
+  /// Markdown 文件渲染模板
+  String _buildMarkdownTemplate(String markdown) {
     final escapedMarkdown = markdown
         .replaceAll('\\', '\\\\')
         .replaceAll('`', '\\`')
         .replaceAll('\$', '\\\$');
     
+    return _getBaseHtmlTemplate('''
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ 
+      startOnLoad: false,
+      theme: 'default'
+    });
+    
+    const markdown = `$escapedMarkdown`;
+    
+    const html = marked.parse(markdown);
+    document.getElementById('content').innerHTML = html;
+    
+    document.querySelectorAll('pre code.language-mermaid').forEach(block => {
+      const code = block.textContent;
+      const pre = block.parentElement;
+      const mermaidDiv = document.createElement('div');
+      mermaidDiv.className = 'mermaid';
+      mermaidDiv.textContent = code;
+      pre.replaceWith(mermaidDiv);
+    });
+    
+    mermaid.init(undefined, '.mermaid');
+  </script>
+''');
+  }
+  
+  /// HTML 文件渲染模板
+  String _buildHtmlTemplate(String htmlContent) {
+    return _getBaseHtmlTemplate('''
+  <script>
+    // 直接插入 HTML 内容
+    const html = `${htmlContent.replaceAll('\$', '\\\$').replaceAll('`', '\\`')}';
+    document.getElementById('content').innerHTML = html;
+    
+    // 处理链接点击
+    document.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const href = link.getAttribute('href');
+        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+          window.location.href = href;
+        }
+      });
+    });
+  </script>
+''');
+  }
+  
+  /// JSON 文件渲染模板
+  String _buildJsonTemplate(String jsonContent) {
+    String formattedJson;
+    try {
+      final decoded = jsonDecode(jsonContent);
+      formattedJson = const JsonEncoder.withIndent('  ').convert(decoded);
+    } catch (e) {
+      formattedJson = jsonContent;
+    }
+    
+    return _getBaseHtmlTemplate('''
+  <style>
+    .json-content {
+      background: #f8f9fa;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+  <script>
+    const json = `${formattedJson.replaceAll('\$', '\\\$').replaceAll('`', '\\`')}';
+    document.getElementById('content').innerHTML = '<pre class="json-content">' + json + '</pre>';
+  </script>
+''');
+  }
+  
+  /// 纯文本渲染模板
+  String _buildPlainTextTemplate(String textContent) {
+    return _getBaseHtmlTemplate('''
+  <style>
+    .plain-text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+  <script>
+    const text = `${textContent.replaceAll('\$', '\\\$').replaceAll('`', '\\`')}';
+    document.getElementById('content').innerHTML = '<div class="plain-text">' + text.replace(/\\n/g, '<br>') + '</div>';
+  </script>
+''');
+  }
+  
+  /// 基础 HTML 模板
+  String _getBaseHtmlTemplate(String customContent) {
     return '''
 <!DOCTYPE html>
 <html>
@@ -948,30 +1258,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 </head>
 <body>
   <div id="content">Loading...</div>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-  <script>
-    mermaid.initialize({ 
-      startOnLoad: false,
-      theme: 'default'
-    });
-    
-    const markdown = `$escapedMarkdown`;
-    
-    const html = marked.parse(markdown);
-    document.getElementById('content').innerHTML = html;
-    
-    document.querySelectorAll('pre code.language-mermaid').forEach(block => {
-      const code = block.textContent;
-      const pre = block.parentElement;
-      const mermaidDiv = document.createElement('div');
-      mermaidDiv.className = 'mermaid';
-      mermaidDiv.textContent = code;
-      pre.replaceWith(mermaidDiv);
-    });
-    
-    mermaid.init(undefined, '.mermaid');
-  </script>
+  $customContent
 </body>
 </html>
 ''';
