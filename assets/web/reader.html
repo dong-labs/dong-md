@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 16px;
+      background: #fff;
+      color: #333;
+      line-height: 1.6;
+      /* 给底部留呼吸空间，避免最后一行被切 */
+      padding-bottom: 80px;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    code {
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 14px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 16px 0;
+      display: block;
+      overflow-x: auto;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: bold;
+    }
+    .mermaid {
+      background: #fafafa;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 16px 0;
+      text-align: center;
+    }
+    a {
+      color: #ff9800;
+      text-decoration: none;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    h1 { font-size: 2em; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    h2 { font-size: 1.5em; }
+    h3 { font-size: 1.25em; }
+    blockquote {
+      border-left: 4px solid #ddd;
+      padding-left: 16px;
+      color: #666;
+      margin: 16px 0;
+    }
+    ul, ol {
+      padding-left: 24px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    /* 加载/错误状态 */
+    #status {
+      display: none;
+      text-align: center;
+      padding: 48px 16px;
+      color: #999;
+    }
+    #status.error {
+      display: block;
+      color: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+  <!-- 内容区，markdown 由 Flutter 通过 setMarkdown() 注入，不经 HTML 解析器，杜绝 </script> 注入 -->
+  <div id="content">Loading...</div>
+  <div id="status">
+    <div id="status-text"></div>
+  </div>
+
+  <!-- 本地内置，完全离线，版本固定 -->
+  <script src="marked.min.js"></script>
+  <script src="mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default'
+    });
+
+    // Flutter 调用此函数注入 markdown 原文。内容作为 JS 字符串字面量传递，
+    // 由 Flutter 端做 JSON.stringify 转义，任何字符（含 </script>）都安全。
+    window.setMarkdown = function (rawMarkdown) {
+      try {
+        var html = marked.parse(rawMarkdown);
+        document.getElementById('content').innerHTML = html;
+
+        // marked 把 ```mermaid 代码块渲染成 <pre><code class="language-mermaid">，
+        // 替换为 .mermaid 容器交给 mermaid 渲染。
+        document.querySelectorAll('pre code.language-mermaid').forEach(function (block) {
+          var code = block.textContent;
+          var pre = block.parentElement;
+          var mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.textContent = code;
+          pre.replaceWith(mermaidDiv);
+        });
+
+        // mermaid v10+：init() 已废弃，改用 run()。
+        // marked 已先把 DOM 生成好，这里再统一渲染 mermaid。
+        mermaid.run({ querySelector: '.mermaid' }).catch(function (e) {
+          // 单个 mermaid 图渲染失败不应让整页崩掉
+          console.error('mermaid render error:', e);
+        });
+      } catch (e) {
+        showError('渲染失败，请检查文件内容是否正确。');
+        console.error('render error:', e);
+      }
+    };
+
+    function showError(msg) {
+      var status = document.getElementById('status');
+      document.getElementById('status-text').textContent = msg;
+      status.className = 'error';
+      document.getElementById('content').textContent = '';
+    }
+
+    // 通知 Flutter 页面已就绪，可以注入内容了。
+    // 用自定义 scheme 避免依赖 JS channel 名耦合。
+    window.addEventListener('load', function () {
+      window.location.hash = 'reader-ready';
+    });
+  </script>
+</body>
+</html>
