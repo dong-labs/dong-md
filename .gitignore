@@ -47,3 +47,6 @@ app.*.map.json
 # 签名配置（含密码，禁止入库）
 /android/key.properties
 **/key.properties
+
+# 本地 AI 工作笔记，不入库
+.zcode/
