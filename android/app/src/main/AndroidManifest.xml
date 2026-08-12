@@ -26,63 +26,82 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             
-            <!-- 打开 Markdown 文件 - mimeType 匹配 -->
+            <!-- 打开文本文件 - 按 mimeType（任意 scheme：file/content/http...） -->
+            <!-- text/* 一网打尽所有文本子类型；application/* 覆盖被识别成二进制流的文本 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/*" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="application/json" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/javascript" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/x-yaml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/x-sh" />
+            </intent-filter>
+            <!-- application/octet-stream 兜底：很多文本文件（.log/.json/.csv 等）会被识别成它 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
 
-            <!-- 打开 Markdown 文件 - file scheme + pathPattern -->
+            <!-- 打开文本文件 - file scheme + pathPattern（按后缀兜底，覆盖 mimeType 缺失/不准的情况） -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="file" />
-                <data android:mimeType="*/*" />
-                <data android:pathPattern=".*\\.md" />
-                <data android:pathPattern=".*\\.markdown" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.([Tt][Xx][Tt]|[Ll][Oo][Gg]|[Mm][Dd]|[Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn]|[Mm][Dd][Xx]|[Rr][Ss][Tt]|[Aa][Dd][Oo][Cc]|[Jj][Ss][Oo][Nn]|[Cc][Ss][Vv]|[Tt][Ss][Vv]|[Xx][Mm][Ll]|[Yy][Aa][Mm][Ll]|[Yy][Mm][Ll]|[Tt][Oo][Mm][Ll]|[Ii][Nn][Ii]|[Cc][Oo][Nn][Ff]|[Cc][Ff][Gg]|[Pp][Rr][Oo][Pp][Ee][Rr][Tt][Ii][Ee][Ss]|[Hh][Tt][Mm][Ll]?|[Cc][Ss][Ss]|[Jj][Ss]|[Mm][Jj][Ss]|[Tt][Ss]|[Jj][Ss][Xx]|[Tt][Ss][Xx]|[Pp][Yy]|[Jj][Aa][Vv][Aa]|[Kk][Tt]|[Cc]|[Cc][Pp][Pp]|[Cc][Xx][Xx]|[Cc][Cc]|[Hh]|[Hh][Pp][Pp]|[Hh][Xx][Xx]|[Ss][Hh]|[Bb][Aa][Ss][Hh]|[Zz][Ss][Hh]|[Ss][Qq][Ll]|[Ss][Vv][Gg]|[Tt][Ee][Xx])$" />
             </intent-filter>
 
-            <!-- 打开 Markdown 文件 - content scheme（微信等应用使用） -->
+            <!-- 打开文本文件 - content scheme + pathPattern（文件管理器/微信等使用） -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
-                <data android:mimeType="*/*" />
-                <data android:pathPattern=".*\\.md" />
-                <data android:pathPattern=".*\\.markdown" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.([Tt][Xx][Tt]|[Ll][Oo][Gg]|[Mm][Dd]|[Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn]|[Mm][Dd][Xx]|[Rr][Ss][Tt]|[Aa][Dd][Oo][Cc]|[Jj][Ss][Oo][Nn]|[Cc][Ss][Vv]|[Tt][Ss][Vv]|[Xx][Mm][Ll]|[Yy][Aa][Mm][Ll]|[Yy][Mm][Ll]|[Tt][Oo][Mm][Ll]|[Ii][Nn][Ii]|[Cc][Oo][Nn][Ff]|[Cc][Ff][Gg]|[Pp][Rr][Oo][Pp][Ee][Rr][Tt][Ii][Ee][Ss]|[Hh][Tt][Mm][Ll]?|[Cc][Ss][Ss]|[Jj][Ss]|[Mm][Jj][Ss]|[Tt][Ss]|[Jj][Ss][Xx]|[Tt][Ss][Xx]|[Pp][Yy]|[Jj][Aa][Vv][Aa]|[Kk][Tt]|[Cc]|[Cc][Pp][Pp]|[Cc][Xx][Xx]|[Cc][Cc]|[Hh]|[Hh][Pp][Pp]|[Hh][Xx][Xx]|[Ss][Hh]|[Bb][Aa][Ss][Hh]|[Zz][Ss][Hh]|[Ss][Qq][Ll]|[Ss][Vv][Gg]|[Tt][Ee][Xx])$" />
             </intent-filter>
 
-            <!-- 接收分享的 Markdown 文件 - ACTION_SEND -->
+            <!-- 接收分享的文本文件 - ACTION_SEND（微信 / 文件管理器等） -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/*" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/x-markdown" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/json" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
