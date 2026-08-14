@@ -1,0 +1,62 @@
+name: Release
+
+# Android APK 打包发布：推 v* tag → 构建 release APK（无签名环境自动 debug 签名）
+# 并附到 GitHub Release（草稿）。workflow_dispatch 仅构建出 artifact。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Build APK
+        # android/key.properties 不入库，CI 走 build.gradle 的 debug 签名 fallback
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "SparrowMD_${GITHUB_REF_NAME:-manual}_android.apk"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparrow-md-android
+          path: "*.apk"
+          if-no-files-found: error
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "麻雀 MD ${GITHUB_REF_NAME}" \
+            --draft --generate-notes \
+            "SparrowMD_${GITHUB_REF_NAME}_android.apk"
