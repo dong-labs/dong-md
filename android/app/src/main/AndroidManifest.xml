@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.inbox.md_reader">
-    
+
     <!-- 文件读取权限 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
-    
+
     <application
         android:label="Dong MD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -19,13 +19,13 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            
+
             <!-- 主启动 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            
+
             <!-- 打开文本文件 - 按 mimeType（任意 scheme：file/content/http...） -->
             <!-- text/* 一网打尽所有文本子类型；application/* 覆盖被识别成二进制流的文本 -->
             <intent-filter>
@@ -64,32 +64,105 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="application/x-sh" />
             </intent-filter>
-            <!-- application/octet-stream 兜底：很多文本文件（.log/.json/.csv 等）会被识别成它 -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/octet-stream" />
-            </intent-filter>
 
-            <!-- 打开文本文件 - file scheme + pathPattern（按后缀兜底，覆盖 mimeType 缺失/不准的情况） -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="file" />
-                <data android:host="*" />
-                <data android:pathPattern=".*\\.([Tt][Xx][Tt]|[Ll][Oo][Gg]|[Mm][Dd]|[Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn]|[Mm][Dd][Xx]|[Rr][Ss][Tt]|[Aa][Dd][Oo][Cc]|[Jj][Ss][Oo][Nn]|[Cc][Ss][Vv]|[Tt][Ss][Vv]|[Xx][Mm][Ll]|[Yy][Aa][Mm][Ll]|[Yy][Mm][Ll]|[Tt][Oo][Mm][Ll]|[Ii][Nn][Ii]|[Cc][Oo][Nn][Ff]|[Cc][Ff][Gg]|[Pp][Rr][Oo][Pp][Ee][Rr][Tt][Ii][Ee][Ss]|[Hh][Tt][Mm][Ll]?|[Cc][Ss][Ss]|[Jj][Ss]|[Mm][Jj][Ss]|[Tt][Ss]|[Jj][Ss][Xx]|[Tt][Ss][Xx]|[Pp][Yy]|[Jj][Aa][Vv][Aa]|[Kk][Tt]|[Cc]|[Cc][Pp][Pp]|[Cc][Xx][Xx]|[Cc][Cc]|[Hh]|[Hh][Pp][Pp]|[Hh][Xx][Xx]|[Ss][Hh]|[Bb][Aa][Ss][Hh]|[Zz][Ss][Hh]|[Ss][Qq][Ll]|[Ss][Vv][Gg]|[Tt][Ee][Xx])$" />
-            </intent-filter>
-
-            <!-- 打开文本文件 - content scheme + pathPattern（文件管理器/微信等使用） -->
+            <!-- 按后缀兜底（覆盖被识别成 application/octet-stream 等无语义类型的文本文件）。
+                 注意：android:pathPattern 用的是 PATTERN_SIMPLE_GLOB，只支持 . * \ 三种语法，
+                 不支持正则的 [] () | ? $，所以每个后缀必须单独写一条 pathPattern。
+                 同时覆盖 content 和 file 两个 scheme。 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
+                <data android:scheme="file" />
                 <data android:host="*" />
-                <data android:pathPattern=".*\\.([Tt][Xx][Tt]|[Ll][Oo][Gg]|[Mm][Dd]|[Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn]|[Mm][Dd][Xx]|[Rr][Ss][Tt]|[Aa][Dd][Oo][Cc]|[Jj][Ss][Oo][Nn]|[Cc][Ss][Vv]|[Tt][Ss][Vv]|[Xx][Mm][Ll]|[Yy][Aa][Mm][Ll]|[Yy][Mm][Ll]|[Tt][Oo][Mm][Ll]|[Ii][Nn][Ii]|[Cc][Oo][Nn][Ff]|[Cc][Ff][Gg]|[Pp][Rr][Oo][Pp][Ee][Rr][Tt][Ii][Ee][Ss]|[Hh][Tt][Mm][Ll]?|[Cc][Ss][Ss]|[Jj][Ss]|[Mm][Jj][Ss]|[Tt][Ss]|[Jj][Ss][Xx]|[Tt][Ss][Xx]|[Pp][Yy]|[Jj][Aa][Vv][Aa]|[Kk][Tt]|[Cc]|[Cc][Pp][Pp]|[Cc][Xx][Xx]|[Cc][Cc]|[Hh]|[Hh][Pp][Pp]|[Hh][Xx][Xx]|[Ss][Hh]|[Bb][Aa][Ss][Hh]|[Zz][Ss][Hh]|[Ss][Qq][Ll]|[Ss][Vv][Gg]|[Tt][Ee][Xx])$" />
+                <!-- 文本 -->
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.text" />
+                <data android:pathPattern=".*\\.log" />
+                <data android:pathPattern=".*\\.rst" />
+                <data android:pathPattern=".*\\.adoc" />
+                <data android:pathPattern=".*\\.asciidoc" />
+                <!-- Markdown 家族 -->
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\.markdown" />
+                <data android:pathPattern=".*\\.mdx" />
+                <data android:pathPattern=".*\\.mkd" />
+                <data android:pathPattern=".*\\.mdown" />
+                <data android:pathPattern=".*\\.mdwn" />
+                <!-- 数据 / 配置 -->
+                <data android:pathPattern=".*\\.json" />
+                <data android:pathPattern=".*\\.json5" />
+                <data android:pathPattern=".*\\.csv" />
+                <data android:pathPattern=".*\\.tsv" />
+                <data android:pathPattern=".*\\.xml" />
+                <data android:pathPattern=".*\\.yaml" />
+                <data android:pathPattern=".*\\.yml" />
+                <data android:pathPattern=".*\\.toml" />
+                <data android:pathPattern=".*\\.ini" />
+                <data android:pathPattern=".*\\.conf" />
+                <data android:pathPattern=".*\\.cfg" />
+                <data android:pathPattern=".*\\.properties" />
+                <data android:pathPattern=".*\\.env" />
+                <!-- Web -->
+                <data android:pathPattern=".*\\.html" />
+                <data android:pathPattern=".*\\.htm" />
+                <data android:pathPattern=".*\\.css" />
+                <data android:pathPattern=".*\\.scss" />
+                <data android:pathPattern=".*\\.sass" />
+                <data android:pathPattern=".*\\.less" />
+                <!-- 代码 -->
+                <data android:pathPattern=".*\\.js" />
+                <data android:pathPattern=".*\\.mjs" />
+                <data android:pathPattern=".*\\.cjs" />
+                <data android:pathPattern=".*\\.ts" />
+                <data android:pathPattern=".*\\.jsx" />
+                <data android:pathPattern=".*\\.tsx" />
+                <data android:pathPattern=".*\\.vue" />
+                <data android:pathPattern=".*\\.svelte" />
+                <data android:pathPattern=".*\\.py" />
+                <data android:pathPattern=".*\\.pyw" />
+                <data android:pathPattern=".*\\.rb" />
+                <data android:pathPattern=".*\\.php" />
+                <data android:pathPattern=".*\\.java" />
+                <data android:pathPattern=".*\\.kt" />
+                <data android:pathPattern=".*\\.kts" />
+                <data android:pathPattern=".*\\.scala" />
+                <data android:pathPattern=".*\\.go" />
+                <data android:pathPattern=".*\\.rs" />
+                <data android:pathPattern=".*\\.c" />
+                <data android:pathPattern=".*\\.h" />
+                <data android:pathPattern=".*\\.cpp" />
+                <data android:pathPattern=".*\\.hpp" />
+                <data android:pathPattern=".*\\.cc" />
+                <data android:pathPattern=".*\\.cxx" />
+                <data android:pathPattern=".*\\.cs" />
+                <data android:pathPattern=".*\\.swift" />
+                <data android:pathPattern=".*\\.dart" />
+                <data android:pathPattern=".*\\.lua" />
+                <data android:pathPattern=".*\\.pl" />
+                <data android:pathPattern=".*\\.pm" />
+                <data android:pathPattern=".*\\.r" />
+                <!-- 脚本 -->
+                <data android:pathPattern=".*\\.sh" />
+                <data android:pathPattern=".*\\.bash" />
+                <data android:pathPattern=".*\\.zsh" />
+                <data android:pathPattern=".*\\.fish" />
+                <data android:pathPattern=".*\\.bat" />
+                <data android:pathPattern=".*\\.cmd" />
+                <data android:pathPattern=".*\\.ps1" />
+                <!-- 其它文本 -->
+                <data android:pathPattern=".*\\.sql" />
+                <data android:pathPattern=".*\\.graphql" />
+                <data android:pathPattern=".*\\.gql" />
+                <data android:pathPattern=".*\\.svg" />
+                <data android:pathPattern=".*\\.tex" />
+                <data android:pathPattern=".*\\.bib" />
+                <data android:pathPattern=".*\\.diff" />
+                <data android:pathPattern=".*\\.patch" />
+                <data android:pathPattern=".*\\.gradle" />
+                <data android:pathPattern=".*\\.groovy" />
+                <data android:pathPattern=".*\\.vim" />
             </intent-filter>
 
             <!-- 接收分享的文本文件 - ACTION_SEND（微信 / 文件管理器等） -->
@@ -114,7 +187,7 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
-        
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
