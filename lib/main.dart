@@ -256,6 +256,30 @@ class FileRecord {
   }
 }
 
+/// 计算内容指纹。不引入额外依赖，用字符串 hashCode（去重场景足够，
+/// 碰撞概率极低且后果仅为多保留一条记录，不影响数据正确性）。
+String contentHashOf(String content) => 'h${content.hashCode}';
+
+/// 字数统计：去除 Markdown 常见语法符号后的可见字符数，
+/// 比纯 content.length 更接近真实阅读量。
+int countWordsOf(String content) {
+  final cleaned = content
+      .replaceAll(RegExp(r'```[\s\S]*?```'), '') // 代码块
+      .replaceAll(RegExp(r'`[^`]*`'), '') // 行内代码
+      .replaceAll(RegExp(r'!\[[^\]]*\]\([^)]*\)'), '') // 图片
+      .replaceAll(RegExp(r'\[([^\]]*)\]\([^)]*\)'), r'$1') // 链接保留文字
+      .replaceAll(RegExp(r'[#>*_~\-]'), '') // 语法符号
+      .replaceAll(RegExp(r'\s+'), '');
+  return cleaned.length;
+}
+
+/// 新建笔记的默认文件名：按时间生成，避免与已有文件冲突。
+String defaultNoteName() {
+  final now = DateTime.now();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '笔记-${two(now.month)}${two(now.day)} ${two(now.hour)}${two(now.minute)}.md';
+}
+
 class FileManager {
   static Future<String> saveFile(String fileName, String content) async {
     final dir = await getApplicationDocumentsDirectory();
@@ -291,6 +315,17 @@ class FileManager {
 
     await File(targetPath).writeAsString(content);
     return targetPath;
+  }
+
+  /// 编辑保存：直接覆盖写回原文件。
+  /// 不走 saveFile（那是导入语义，同路径不同内容会另存 _1.md 副本，
+  /// 用于编辑会把同一次笔记越存越多）。
+  static Future<void> updateFile(String localPath, String content) async {
+    final file = File(localPath);
+    if (!await file.exists()) {
+      throw FileSystemException('文件不存在', localPath);
+    }
+    await file.writeAsString(content);
   }
 
   static Future<String> renameFile(String oldPath, String newFileName) async {
@@ -421,28 +456,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setInt('history_sort', _sort.index);
   }
 
-  /// 计算内容指纹。不引入额外依赖，用字符串 hashCode（去重场景足够，
-  /// 碰撞概率极低且后果仅为多保留一条记录，不影响数据正确性）。
-  String _contentHash(String content) => 'h${content.hashCode}';
-
-  /// 字数统计：去除 Markdown 常见语法符号后的可见字符数，
-  /// 比纯 content.length 更接近真实阅读量。
-  int _countWords(String content) {
-    final cleaned = content
-        .replaceAll(RegExp(r'```[\s\S]*?```'), '') // 代码块
-        .replaceAll(RegExp(r'`[^`]*`'), '') // 行内代码
-        .replaceAll(RegExp(r'!\[[^\]]*\]\([^)]*\)'), '') // 图片
-        .replaceAll(RegExp(r'\[([^\]]*)\]\([^)]*\)'), r'$1') // 链接保留文字
-        .replaceAll(RegExp(r'[#>*_~\-]'), '') // 语法符号
-        .replaceAll(RegExp(r'\s+'), '');
-    return cleaned.length;
-  }
-
   Future<FileRecord> _addFileToHistory(String fileName, String content) async {
     final localPath = await FileManager.saveFile(fileName, content);
-    final hash = _contentHash(content);
+    final hash = contentHashOf(content);
     final now = DateTime.now();
-    final wordCount = _countWords(content);
+    final wordCount = countWordsOf(content);
     final fileSize = await FileManager.getFileSize(localPath);
 
     // 去重 + 置顶：命中相同内容指纹的旧记录，更新其时间/大小并移到列表头部。
@@ -633,6 +651,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton(
+        tooltip: '新建笔记',
+        onPressed: _createNote,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
@@ -775,14 +798,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 打开内置示例文档：让用户首次进入就能直观看到 Markdown 渲染效果，
-  /// 同时也是一份「怎么用」的引导。示例不入历史，纯展示。
+  /// 同时也是一份「怎么用」的引导。示例会入历史，方便下次再看。
   Future<void> _openDemo() async {
     const fileName = '示例文档.md';
     const content = _kDemoMarkdown;
     final record = await _addFileToHistory(fileName, content);
     final fileType = FileDetector.detect(fileName, content);
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReaderScreen(
@@ -793,6 +816,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    if (mounted) _loadHistory();
+  }
+
+  /// 新建笔记：先进编辑器，保存（由 EditorScreen 写文件 + 入历史）后刷新列表。
+  Future<void> _createNote() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditorScreen(
+          fileName: defaultNoteName(),
+          initialContent: '',
+          localPath: null,
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      _loadHistory();
+    }
   }
 
   Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
@@ -903,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 检测文件类型
     final fileType = FileDetector.detect(record.fileName, content);
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReaderScreen(
@@ -914,6 +955,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+    // 阅读页内可能编辑保存过（SP 历史已被 EditorScreen 更新），回来重载列表。
+    if (mounted) _loadHistory();
   }
 
   void _handleMenuAction(String action, FileRecord record, int index) {
@@ -1111,6 +1154,9 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> {
   late final WebViewController _controller;
 
+  // 正文放在 state 里：编辑保存返回后可就地刷新，无需重建页面。
+  late String _content = widget.content;
+
   @override
   void initState() {
     super.initState();
@@ -1129,12 +1175,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
               launchUrl(Uri.parse(request.url));
               return NavigationDecision.prevent;
             }
-            // 页面就绪信号：reader.html load 后会设置 hash = 'reader-ready'，
-            // 此时 DOM 与脚本已加载，通过 JS 桥接注入 markdown 内容。
-            if (request.url.contains('#reader-ready')) {
-              _injectContent();
-            }
             return NavigationDecision.navigate;
+          },
+          // 页面加载完成后注入内容。此前用 hash '#reader-ready' 作为就绪信号，
+          // 但 hash 变化不构成一次导航、不触发 onNavigationRequest，注入从未执行，
+          // 页面空白。onPageFinished 是 WebView 标准的「DOM + 脚本就绪」时机。
+          onPageFinished: (String url) {
+            debugPrint('[sparrow] onPageFinished: $url');
+            _injectContent();
           },
         ),
       )
@@ -1145,8 +1193,45 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// 用 jsonEncode 转义，任何字符（含 `</script>`、反引号、$）都作为合法 JS
   /// 字符串字面量传递，彻底规避 HTML 解析层面的注入风险。
   void _injectContent() {
-    final encodedContent = jsonEncode(widget.content);
-    _controller.runJavaScript('window.setMarkdown($encodedContent);');
+    final encodedContent = jsonEncode(_content);
+    debugPrint('[sparrow] inject: len=${_content.length}');
+    _controller.runJavaScript('window.setMarkdown($encodedContent);').then((_) {
+      // 注入后回读 DOM，确认内容真的渲染上去了
+      return _controller.runJavaScriptReturningResult(
+        'document.getElementById("content").innerHTML.length',
+      );
+    }).then((len) {
+      debugPrint('[sparrow] injected, dom html length = $len');
+    }).catchError((e) {
+      debugPrint('[sparrow] inject failed: $e');
+    });
+  }
+
+  /// 跳编辑页；保存返回后就地刷新正文（重读磁盘 + 重新注入 WebView）。
+  Future<void> _editContent() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditorScreen(
+          fileName: widget.fileName,
+          initialContent: _content,
+          localPath: widget.localPath,
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      // 从磁盘重读，保证与保存内容一致
+      final fresh = await File(widget.localPath).readAsString();
+      setState(() => _content = fresh);
+      _injectContent();
+    }
+  }
+
+  void _copyMarkdown() {
+    Clipboard.setData(ClipboardData(text: _content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Markdown 已复制')),
+    );
   }
 
   @override
@@ -1170,7 +1255,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             icon: const Icon(Icons.share),
             onSelected: (value) {
               if (value == 'content') {
-                Share.share(widget.content, subject: widget.fileName);
+                Share.share(_content, subject: widget.fileName);
               } else if (value == 'file') {
                 Share.shareXFiles(
                   [XFile(widget.localPath)],
@@ -1198,14 +1283,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
-              if (value == 'detail') {
+              if (value == 'edit') {
+                _editContent();
+              } else if (value == 'copy') {
+                _copyMarkdown();
+              } else if (value == 'detail') {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => FileDetailScreen(
                       fileName: widget.fileName,
                       localPath: widget.localPath,
-                      content: widget.content,
+                      content: _content,
                     ),
                   ),
                 );
@@ -1217,6 +1306,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('编辑'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'copy',
+                child: ListTile(
+                  leading: Icon(Icons.copy_outlined),
+                  title: Text('复制 Markdown'),
+                ),
+              ),
               const PopupMenuItem(
                 value: 'detail',
                 child: ListTile(
@@ -1236,6 +1339,286 @@ class _ReaderScreenState extends State<ReaderScreen> {
         ],
       ),
       body: WebViewWidget(controller: _controller),
+    );
+  }
+}
+
+/// 编辑/新建笔记：Markdown 源码编辑。
+/// 保存后 pop(true)，调用方据此刷新（ReaderScreen 刷新正文，HomeScreen 重载历史）。
+/// localPath 为 null 表示新建。
+class EditorScreen extends StatefulWidget {
+  final String fileName;
+  final String initialContent;
+  final String? localPath;
+
+  const EditorScreen({
+    super.key,
+    required this.fileName,
+    required this.initialContent,
+    this.localPath,
+  });
+
+  @override
+  State<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends State<EditorScreen> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _saved = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialContent);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  bool get _dirty => _controller.text != widget.initialContent || _saved;
+
+  /// 用光标选区包裹语法（无选中则插入空语法并落在中间）。
+  void _wrapSelection(String before, [String after = '']) {
+    final value = _controller.value;
+    final sel = value.selection;
+    if (!sel.isValid) return;
+    final selected = sel.textInside(value.text);
+    final replaced = before + selected + after;
+    _controller.value = value.copyWith(
+      text: value.text.replaceRange(sel.start, sel.end, replaced),
+      selection: TextSelection.collapsed(
+        offset: sel.start + before.length + selected.length,
+      ),
+    );
+    _focusNode.requestFocus();
+  }
+
+  /// 在光标所在行行首插入前缀（标题、列表、引用）。
+  void _insertLinePrefix(String prefix) {
+    final value = _controller.value;
+    final sel = value.selection;
+    final text = value.text;
+    if (!sel.isValid) return;
+    final caret = sel.start;
+    final lineStart = caret == 0 ? 0 : text.lastIndexOf('\n', caret - 1) + 1;
+    _controller.value = value.copyWith(
+      text: text.replaceRange(lineStart, lineStart, prefix),
+      selection: TextSelection.collapsed(offset: caret + prefix.length),
+    );
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final content = _controller.text;
+
+    // 新建的空白笔记不保存，避免产生垃圾记录。
+    if (widget.localPath == null && content.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('内容为空，未保存')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      if (widget.localPath != null) {
+        await FileManager.updateFile(widget.localPath!, content);
+        await _updateHistoryRecord(content);
+      } else {
+        final fileName = defaultNoteName();
+        final path = await FileManager.saveFile(fileName, content);
+        await _appendHistoryRecord(fileName, content, path);
+      }
+      _saved = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已保存')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e')),
+        );
+      }
+    }
+  }
+
+  /// 编辑保存：更新 SP 历史里 localPath 对应记录的元数据。
+  Future<void> _updateHistoryRecord(String content) async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = prefs.getString('file_history') ?? '[]';
+    final List<dynamic> decoded = jsonDecode(historyJson);
+    for (final e in decoded) {
+      if (e is Map && e['localPath'] == widget.localPath) {
+        e['contentHash'] = contentHashOf(content);
+        e['wordCount'] = countWordsOf(content);
+        e['fileSize'] = content.length;
+        e['openedAt'] = DateTime.now().toIso8601String();
+        break;
+      }
+    }
+    await prefs.setString('file_history', jsonEncode(decoded));
+  }
+
+  /// 新建保存：在 SP 历史头部追加记录。
+  Future<void> _appendHistoryRecord(
+      String fileName, String content, String localPath) async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = prefs.getString('file_history') ?? '[]';
+    final List<dynamic> decoded = jsonDecode(historyJson);
+    decoded.insert(0, {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'fileName': fileName,
+      'localPath': localPath,
+      'openedAt': DateTime.now().toIso8601String(),
+      'contentHash': contentHashOf(content),
+      'wordCount': countWordsOf(content),
+      'fileSize': content.length,
+    });
+    await prefs.setString('file_history', jsonEncode(decoded));
+  }
+
+  Future<void> _confirmExit() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('未保存的修改'),
+        content: const Text('修改尚未保存，确定要退出吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('继续编辑'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('放弃修改',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) {
+      Navigator.pop(context, false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmExit();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.localPath == null ? '新建笔记' : '编辑',
+            overflow: TextOverflow.ellipsis,
+          ),
+          actions: [
+            IconButton(
+              tooltip: '保存',
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              onPressed: _saving ? null : _save,
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: Column(
+          children: [
+            // 快捷插入栏：手机上输入 Markdown 符号费劲，提供常用语法一键插入
+            Material(
+              color: colorScheme.surfaceContainerLow,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    _shortcutButton('B', '粗体', () => _wrapSelection('**', '**')),
+                    _shortcutButton('H', '标题', () => _insertLinePrefix('## ')),
+                    _shortcutButton('</>', '代码', () => _wrapSelection('`', '`')),
+                    _shortcutButton('•', '列表', () => _insertLinePrefix('- ')),
+                    _shortcutButton('❝', '引用', () => _insertLinePrefix('> ')),
+                    _shortcutButton('🔗', '链接', () => _wrapSelection('[', '](https://)')),
+                    _shortcutButton('☰', '表格', () => _wrapSelection(
+                        '\n| 列1 | 列2 |\n| --- | --- |\n| 内容 | 内容 |\n')),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                keyboardType: TextInputType.multiline,
+                onChanged: (_) => setState(() {}), // 刷新底部字数
+                style: const TextStyle(
+                  fontFamily: 'SF Mono',
+                  fontSize: 14,
+                  height: 1.6,
+                ),
+                decoration: const InputDecoration(
+                  hintText: '输入 Markdown 内容…\n\n上方工具栏可快捷插入语法',
+                  contentPadding: EdgeInsets.all(16),
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+            // 底部状态栏：字数
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: colorScheme.surfaceContainerLow,
+              child: Text(
+                '${countWordsOf(_controller.text)} 字',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _shortcutButton(String label, String tooltip, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Tooltip(
+        message: tooltip,
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          child: Text(label, style: const TextStyle(fontSize: 13)),
+        ),
+      ),
     );
   }
 }

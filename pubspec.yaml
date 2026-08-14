@@ -26,6 +26,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  assets:
+    - assets/web/
+    - assets/icon/
+    - assets/icon.svg
+
 flutter_launcher_icons:
   android: true
   ios: true
@@ -34,8 +39,3 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   adaptive_icon_background: "#F59E0B"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
-
-  assets:
-    - assets/web/
-    - assets/icon/
-    - assets/icon.svg

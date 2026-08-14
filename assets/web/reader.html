@@ -88,8 +88,9 @@
   </style>
 </head>
 <body>
-  <!-- 内容区，markdown 由 Flutter 通过 setMarkdown() 注入，不经 HTML 解析器，杜绝 </script> 注入 -->
-  <div id="content">Loading...</div>
+  <!-- 内容区，markdown 由 Flutter 通过 setMarkdown() 注入，不经 HTML 解析器，杜绝 </script> 注入。
+       初始留空：注入前显示干净的白屏，避免闪现 Loading 字样。 -->
+  <div id="content"></div>
   <div id="status">
     <div id="status-text"></div>
   </div>

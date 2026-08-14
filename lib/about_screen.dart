@@ -61,19 +61,11 @@ class _AboutScreenState extends State<AboutScreen> {
           children: [
             const SizedBox(height: 32),
             
-            // App 图标
+            // App 图标（真实图标：琥珀底 + 翅膀，与三端品牌统一）
             Container(
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.primaryContainer,
-                  ],
-                ),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
@@ -83,10 +75,11 @@ class _AboutScreenState extends State<AboutScreen> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.description_outlined,
-                size: 50,
-                color: Colors.white,
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
               ),
             ),
             

@@ -5,34 +5,13 @@
       <stop offset="55%" stop-color="#F59E0B"/>
       <stop offset="100%" stop-color="#B45309"/>
     </linearGradient>
-    <linearGradient id="wing" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#92400E"/>
-      <stop offset="100%" stop-color="#78350F"/>
-    </linearGradient>
   </defs>
 
-  <!-- 底板：暖琥珀圆角方块（rx≈0.227，跨平台通用 squircle）-->
+  <!-- 底板：暖琥珀圆角方块 -->
   <rect width="512" height="512" rx="116" fill="url(#bg)"/>
 
-  <!-- 麻雀剪影（面朝右，栖息姿态），同色形体重叠即整体轮廓 -->
-  <g>
-    <!-- 尾羽：向左后下方扫出 -->
-    <path d="M178 252 Q 110 282 92 322 Q 120 312 150 312 Q 172 312 200 324 Q 188 282 178 252 Z" fill="#FFFBF0"/>
-
-    <!-- 身体：圆润丰满 -->
-    <ellipse cx="252" cy="298" rx="104" ry="80" fill="#FFFBF0"/>
-
-    <!-- 头部：右上，与身体重叠 -->
-    <circle cx="340" cy="226" r="60" fill="#FFFBF0"/>
-
-    <!-- 翅膀：从肩部扫向腹部，深琥珀色 -->
-    <path d="M214 256 Q 262 270 300 330 Q 252 352 196 300 Q 200 274 214 256 Z" fill="url(#wing)"/>
-
-    <!-- 喙：短粗，面朝右 -->
-    <path d="M392 242 L 424 260 L 392 276 Z" fill="#92400E"/>
-
-    <!-- 眼睛 -->
-    <circle cx="356" cy="220" r="10" fill="#44403C"/>
-    <circle cx="359" cy="217" r="3" fill="#FFFBF0"/>
-  </g>
+  <!-- 翅膀：两道弧线，飞行定格（品牌故事：麻雀虽小，飞得远） -->
+  <path d="M87 295 Q 165 152 256 256 Q 347 152 425 295"
+        fill="none" stroke="#FFFBF0" stroke-width="44"
+        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
