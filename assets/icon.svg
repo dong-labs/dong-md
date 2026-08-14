@@ -1,36 +1,38 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF9800;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#F57C00;stop-opacity:1" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="55%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#92400E"/>
+      <stop offset="100%" stop-color="#78350F"/>
     </linearGradient>
   </defs>
-  
-  <!-- 背景 -->
-  <rect width="512" height="512" rx="128" fill="url(#bgGradient)"/>
-  
-  <!-- 文档背景 -->
-  <rect x="136" y="96" width="240" height="320" rx="24" fill="white" opacity="0.95"/>
-  
-  <!-- 文档折角 -->
-  <path d="M328 96 L376 96 L376 144 L328 144 Z" fill="white" opacity="0.8"/>
-  <path d="M328 96 L376 144 L328 144 Z" fill="#FFE0B2"/>
-  
-  <!-- Markdown M -->
-  <text x="256" y="260" 
-        font-family="SF Mono, Monaco, monospace" 
-        font-size="160" 
-        font-weight="bold" 
-        fill="#FF9800" 
-        text-anchor="middle"
-        opacity="0.9">M</text>
-  
-  <!-- 下划线装饰 -->
-  <rect x="176" y="300" width="160" height="8" rx="4" fill="#FFB74D" opacity="0.6"/>
-  <rect x="176" y="320" width="120" height="8" rx="4" fill="#FFB74D" opacity="0.4"/>
-  <rect x="176" y="340" width="80" height="8" rx="4" fill="#FFB74D" opacity="0.2"/>
-  
-  <!-- 阅读器图标 -->
-  <circle cx="256" cy="380" r="24" fill="#FF9800"/>
-  <path d="M248 380 L252 384 L264 372" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 底板：暖琥珀圆角方块（rx≈0.227，跨平台通用 squircle）-->
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+
+  <!-- 麻雀剪影（面朝右，栖息姿态），同色形体重叠即整体轮廓 -->
+  <g>
+    <!-- 尾羽：向左后下方扫出 -->
+    <path d="M178 252 Q 110 282 92 322 Q 120 312 150 312 Q 172 312 200 324 Q 188 282 178 252 Z" fill="#FFFBF0"/>
+
+    <!-- 身体：圆润丰满 -->
+    <ellipse cx="252" cy="298" rx="104" ry="80" fill="#FFFBF0"/>
+
+    <!-- 头部：右上，与身体重叠 -->
+    <circle cx="340" cy="226" r="60" fill="#FFFBF0"/>
+
+    <!-- 翅膀：从肩部扫向腹部，深琥珀色 -->
+    <path d="M214 256 Q 262 270 300 330 Q 252 352 196 300 Q 200 274 214 256 Z" fill="url(#wing)"/>
+
+    <!-- 喙：短粗，面朝右 -->
+    <path d="M392 242 L 424 260 L 392 276 Z" fill="#92400E"/>
+
+    <!-- 眼睛 -->
+    <circle cx="356" cy="220" r="10" fill="#44403C"/>
+    <circle cx="359" cy="217" r="3" fill="#FFFBF0"/>
+  </g>
 </svg>

@@ -1,4 +1,4 @@
-package com.inbox.md_reader
+package com.gudong.sparrow
 
 import android.content.Intent
 import android.net.Uri
@@ -12,7 +12,7 @@ import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.inbox.md_reader/file"
+    private val CHANNEL = "com.gudong.sparrow/file"
 
     // Flutter 还没就绪时，先缓存住 Intent 带来的文件内容，
     // 等 Dart 端 initState 注册好 handler 后主动调用 consumeLaunchContent 取走。

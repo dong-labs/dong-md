@@ -94,7 +94,7 @@ class _AboutScreenState extends State<AboutScreen> {
             
             // App 名称
             Text(
-              '麻袋咚 Dong MD',
+              '麻雀MD',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,

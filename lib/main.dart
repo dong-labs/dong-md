@@ -10,7 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 
 void main() {
-  runApp(const DongMDApp());
+  runApp(const SparrowApp());
 }
 
 /// 文件类型枚举
@@ -171,16 +171,16 @@ class FileDetector {
   }
 }
 
-class DongMDApp extends StatelessWidget {
-  const DongMDApp({super.key});
+class SparrowApp extends StatelessWidget {
+  const SparrowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Dong MD',
+      title: '麻雀MD',
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.orange,
+        colorSchemeSeed: const Color(0xFF4078F0),
       ),
       home: const HomeScreen(),
     );
@@ -363,7 +363,7 @@ class HomeScreen extends StatefulWidget {
 enum HistorySort { recent, name, size }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _channel = MethodChannel('com.inbox.md_reader/file');
+  static const _channel = MethodChannel('com.gudong.sparrow/file');
 
   List<FileRecord> _history = [];
   bool _isLoading = true;
@@ -569,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
             )
-          : const Text('Dong MD'),
+          : const Text('麻雀MD'),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -674,34 +674,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Logo
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF9800), Color(0xFFF57C00)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.description,
-                size: 40,
-                color: Colors.white,
+            // Logo（麻雀品牌图标）
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
               ),
             ),
 
@@ -709,7 +694,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // 标题
             const Text(
-              'Dong MD',
+              '麻雀MD',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -720,14 +705,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Slogan
             Text(
-              '阅读 Markdown，就这么简单',
+              '随身阅读任意文本文件',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[600],
               ),
             ),
 
-            const SizedBox(height: 48),
+            const SizedBox(height: 20),
+
+            // 用法说明
+            Text(
+              '在微信、文件管理器或其他应用里收到 Markdown、日志、代码等文本文件时，'
+              '选择用麻雀MD 打开，即可获得清爽舒适的阅读体验。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[500],
+                height: 1.6,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 打开示例文档
+            FilledButton.icon(
+              onPressed: _openDemo,
+              icon: const Icon(Icons.menu_book_outlined),
+              label: const Text('打开示例文档'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              ),
+            ),
+
+            const SizedBox(height: 32),
 
             // 功能说明卡片
             Card(
@@ -737,21 +748,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: [
                     _buildFeatureItem(
-                      Icons.share,
-                      '从其他应用分享',
-                      '微信 / Telegram / 文件管理器',
+                      Icons.share_outlined,
+                      '从其他应用打开',
+                      '微信 / 文件管理器里点「打开方式」或「分享」',
                     ),
                     const Divider(),
                     _buildFeatureItem(
-                      Icons.folder_open,
-                      '从文件管理器打开',
-                      '支持任意文本文件（.md / .txt / .log / .json ...）',
+                      Icons.folder_open_outlined,
+                      '支持任意文本文件',
+                      '.md / .txt / .log / .json / .csv ...',
                     ),
                     const Divider(),
                     _buildFeatureItem(
-                      Icons.auto_awesome,
-                      '支持 Mermaid 流程图',
-                      '自动渲染表格和流程图',
+                      Icons.auto_awesome_outlined,
+                      '优质排版',
+                      '自动渲染表格、代码高亮、Mermaid 流程图',
                     ),
                   ],
                 ),
@@ -763,9 +774,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 打开内置示例文档：让用户首次进入就能直观看到 Markdown 渲染效果，
+  /// 同时也是一份「怎么用」的引导。示例不入历史，纯展示。
+  Future<void> _openDemo() async {
+    const fileName = '示例文档.md';
+    const content = _kDemoMarkdown;
+    final record = await _addFileToHistory(fileName, content);
+    final fileType = FileDetector.detect(fileName, content);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReaderScreen(
+          fileName: record.fileName,
+          content: content,
+          localPath: record.localPath,
+          fileType: fileType,
+        ),
+      ),
+    );
+  }
+
   Widget _buildFeatureItem(IconData icon, String title, String subtitle) {
     return ListTile(
-      leading: Icon(icon, color: Colors.orange),
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
       subtitle: Text(
         subtitle,
@@ -1109,13 +1141,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ..loadFlutterAsset('assets/web/reader.html');
   }
 
-  /// 通过 JS 调用 HTML 内的 setContent 注入正文和文件类型。
+  /// 通过 JS 调用 HTML 内的 setMarkdown 注入正文。
   /// 用 jsonEncode 转义，任何字符（含 `</script>`、反引号、$）都作为合法 JS
   /// 字符串字面量传递，彻底规避 HTML 解析层面的注入风险。
   void _injectContent() {
     final encodedContent = jsonEncode(widget.content);
-    final encodedType = jsonEncode(widget.fileType.name);
-    _controller.runJavaScript('window.setContent($encodedContent, $encodedType);');
+    _controller.runJavaScript('window.setMarkdown($encodedContent);');
   }
 
   @override
@@ -1353,3 +1384,70 @@ class FileDetailScreen extends StatelessWidget {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }
+
+/// 内置示例文档：首次进入空状态时点击「打开示例文档」展示。
+/// 既演示麻雀MD 的 Markdown 渲染能力，又充当「怎么用」的引导。
+const String _kDemoMarkdown = r'''# 欢迎使用麻雀MD 🕊️
+
+麻雀MD 是一个轻量的文本阅读器。当你在**微信、文件管理器**或其他应用里收到 Markdown、日志、代码等文本文件时，选择用麻雀MD 打开，就能获得清爽舒适的阅读体验。
+
+## 它能做什么
+
+- 📖 渲染 Markdown：标题、列表、**粗体**、*斜体*、`行内代码`
+- 📊 自动渲染表格和 Mermaid 流程图
+- 🎨 代码高亮、亮暗主题
+- 📂 支持任意文本文件：`.md` / `.txt` / `.log` / `.json` / `.csv` ...
+
+## 怎么用
+
+1. 在微信或文件管理器里**长按或点击**一个文本文件
+2. 选择「**打开方式**」或「**分享**」
+3. 选择 **麻雀MD**
+
+> 💡 提示：打开过的文件会自动保存在首页，下次可以直接点开继续阅读。
+
+---
+
+下面是一些排版样例，看看麻雀MD 的渲染效果。
+
+## 表格
+
+| 类型 | 后缀 | 说明 |
+| :--- | :--- | :--- |
+| Markdown | .md .markdown | 完整渲染 |
+| 纯文本 | .txt .log | 保留格式 |
+| 代码 / 数据 | .json .csv .yaml | 代码高亮 |
+
+## 代码块
+
+```dart
+void main() {
+  // 麻雀MD，麻雀虽小，五脏俱全
+  print('Hello, 麻雀MD!');
+}
+```
+
+## 列表与引用
+
+- 这是一条列表项
+- 支持嵌套
+  - 子列表项
+- 还可以继续
+
+> 这是一段引用，用来强调某段重要内容。
+>
+> 引用里也可以有**粗体**和 `代码`。
+
+## 流程图
+
+```mermaid
+graph LR
+  A[收到文本文件] --> B{选择打开方式}
+  B -->|麻雀MD| C[舒适阅读]
+  B -->|其他应用| D[体验不佳]
+```
+
+---
+
+享受阅读，就这么简单。🕊️
+''';

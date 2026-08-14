@@ -1,9 +1,9 @@
-name: dong_md
-description: Dong MD - 阅读 Markdown，就这么简单
+name: sparrow_md
+description: Sparrow MD - 麻雀，一只轻量的 Markdown 阅读器
 
 publish_to: none
 
-version: 1.5.1+7
+version: 1.6.0+8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -21,10 +21,21 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.0
 
 flutter:
   uses-material-design: true
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  adaptive_icon_background: "#F59E0B"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
   assets:
     - assets/web/
+    - assets/icon/
     - assets/icon.svg
